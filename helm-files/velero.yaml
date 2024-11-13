@@ -1,0 +1,53 @@
+serviceAccount:
+  server:
+    annotations:
+      eks.amazonaws.com/role-arn: ${service_account_arn}
+
+configuration:
+  provider: aws
+  backupStorageLocation:
+    name: default
+    provider: aws
+    bucket: "${velero_bucket}"
+    prefix: "velero/${eks_cluster}"
+    config:
+      region: ${region}
+
+  volumeSnapshotLocation:
+    name: default
+    provider: aws
+    config:
+      region: ${region}
+
+  extraEnvVars:
+    AWS_CLUSTER_NAME: ${eks_cluster}
+
+credentials:
+  useSecret: false
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.11.0
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+upgradeCRDs: true
+installCRDs: true
+
+image:
+  repository: velero/velero
+  tag: v1.15.0
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 128Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+backupsEnabled: true
+snapshotsEnabled: true

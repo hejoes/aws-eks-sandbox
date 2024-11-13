@@ -36,5 +36,6 @@ variable "eks_cluster" {
 # }
 
 variable "velero_bucket" {
-  type = string
+  type        = string
+  description = "Name of the S3 bucket for Velero backups. Must be globally unique."
 }

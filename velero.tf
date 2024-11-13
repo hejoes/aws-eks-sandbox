@@ -1,125 +1,133 @@
-# #Velero
-# resource "aws_s3_bucket" "velero" {
-#   bucket = var.velero_bucket
+#Velero
+resource "aws_s3_bucket" "velero" {
+  bucket = var.velero_bucket
 
-#   tags = {
-#     Name = var.velero_bucket
-#   }
-# }
-
-# resource "aws_s3_bucket_versioning" "velero" {
-#   bucket = aws_s3_bucket.velero.id
-#   versioning_configuration {
-#     status = "Enabled"
-#   }
-# }
-
-# module "velero" {
-#   source  = "terraform-module/velero/kubernetes"
-#   version = "1.1.1"
-
-#   namespace_deploy            = true
-#   app_deploy                  = true
-#   cluster_name                = module.eks.cluster_name
-#   bucket                      = var.velero_bucket
-#   openid_connect_provider_uri = module.eks.oidc_provider
+  tags = {
+    Name = var.velero_bucket
+  }
+}
 
 
-#   values = [<<EOF
-# # https://github.com/vmware-tanzu/helm-charts/tree/master/charts/velero
+resource "aws_s3_bucket_policy" "velero" {
+  bucket = aws_s3_bucket.velero.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Velero"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.velero.arn
+        }
+        Action = [
+          "s3:ListBucket",
+          "s3:GetObject",
+          "s3:DeleteObject",
+          "s3:PutObject",
+          "s3:AbortMultipartUpload",
+          "s3:ListBucketVersions",
+          "s3:ListMultipartUploadParts"
+        ]
+        Resource = [
+          aws_s3_bucket.velero.arn,
+          "${aws_s3_bucket.velero.arn}/*"
+        ]
+      }
+    ]
+  })
+}
 
-# image:
-#   repository: velero/velero
-#   tag: v1.8.1
+resource "aws_iam_policy" "velero" {
+  name        = "velero-${var.eks_cluster}"
+  description = "Policy for Velero backup and restore"
 
-# # https://aws.amazon.com/blogs/containers/backup-and-restore-your-amazon-eks-cluster-resources-using-velero/
-# # https://github.com/vmware-tanzu/velero-plugin-for-aws
-# initContainers:
-#   - name: velero-plugin-for-aws
-#     image: velero/velero-plugin-for-aws:v1.4.1
-#     imagePullPolicy: IfNotPresent
-#     volumeMounts:
-#       - mountPath: /target
-#         name: plugins
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:Describe*",
+          "ec2:CreateTags",
+          "ec2:CreateVolume",
+          "ec2:CreateSnapshot",
+          "ec2:DeleteSnapshot"
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetObject",
+          "s3:DeleteObject",
+          "s3:PutObject",
+          "s3:AbortMultipartUpload",
+          "s3:ListMultipartUploadParts"
+        ]
+        Resource = [
+          aws_s3_bucket.velero.arn,
+          "${aws_s3_bucket.velero.arn}/*"
+        ]
+      }
+    ]
+  })
+}
 
-# # Install CRDs as a templates. Enabled by default.
-# installCRDs: true
+resource "aws_iam_role" "velero" {
+  name = "velero-${var.eks_cluster}"
 
-# # SecurityContext to use for the Velero deployment. Optional.
-# # Set fsGroup for `AWS IAM Roles for Service Accounts`
-# # see more informations at: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
-# securityContext:
-#   fsGroup: 1337
-#   # fsGroup: 65534
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${module.eks.oidc_provider}:sub" : "system:serviceaccount:velero:velero",
+            "${module.eks.oidc_provider}:aud" : "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
 
-# ##
-# ## Parameters for the `default` BackupStorageLocation and VolumeSnapshotLocation,
-# ## and additional server settings.
-# ##
-# configuration:
-#   provider: aws
+resource "aws_iam_role_policy_attachment" "velero" {
+  policy_arn = aws_iam_policy.velero.arn
+  role       = aws_iam_role.velero.name
+}
 
-#   backupStorageLocation:
-#     name: default
-#     provider: aws
-#     bucket: "${var.velero_bucket}"
-#     prefix: "velero/${var.eks_cluster}"
-#     config:
-#       region: ${var.region}
+resource "aws_s3_bucket_versioning" "velero" {
+  bucket = aws_s3_bucket.velero.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
 
-#   volumeSnapshotLocation:
-#     name: default
-#     provider: aws
-#     # Additional provider-specific configuration. See link above
-#     # for details of required/optional fields for your provider.
-#     config:
-#       region: ${var.region}
+module "velero" {
+  source  = "terraform-module/velero/kubernetes"
+  version = "1.2.0"
 
-#   # These are server-level settings passed as CLI flags to the `velero server` command. Velero
-#   # uses default values if they're not passed in, so they only need to be explicitly specified
-#   # here if using a non-default value. The `velero server` default values are shown in the
-#   # comments below.
-#   # --------------------
-#   # `velero server` default: 1m
-#   backupSyncPeriod:
-#   # `velero server` default: 1h
-#   resticTimeout:
-#   # `velero server` default: namespaces,persistentvolumes,persistentvolumeclaims,secrets,configmaps,serviceaccounts,limitranges,pods
-#   restoreResourcePriorities:
-#   # `velero server` default: false
-#   restoreOnlyMode:
+  namespace_deploy            = true
+  app_deploy                  = true
+  cluster_name                = module.eks.cluster_name
+  bucket                      = var.velero_bucket
+  openid_connect_provider_uri = module.eks.oidc_provider
 
-#   extraEnvVars:
-#     AWS_CLUSTER_NAME: ${var.eks_cluster}
+  values = [templatefile("${path.module}/helm-files/velero.yaml", {
+    velero_bucket       = var.velero_bucket
+    eks_cluster         = var.eks_cluster
+    region              = var.region
+    service_account_arn = aws_iam_role.velero.arn
+  })]
 
-#   # Set log-level for Velero pod. Default: info. Other options: debug, warning, error, fatal, panic.
-#   logLevel: info
-
-# ##
-# ## End of backup/snapshot location settings.
-# ##
-
-# ##
-# ## Settings for additional Velero resources.
-# ##
-# rbac:
-#   create: true
-#   clusterAdministrator: true
-
-# credentials:
-#   # Whether a secret should be used as the source of IAM account
-#   # credentials. Set to false if, for example, using kube2iam or
-#   # kiam to provide IAM credentials for the Velero pod.
-#   useSecret: false
-
-# backupsEnabled: true
-# snapshotsEnabled: true
-# deployRestic: false
-# EOF
-#   ]
-
-#   # only deploy after all karpenter resources have been created, otherwise no nodes will be provisioned for velero
-#   depends_on = [
-#     kubectl_manifest.karpenter_node_pool
-#   ]
-# }
+  # only deploy after all karpenter resources have been created, otherwise no nodes will be provisioned for velero
+  depends_on = [
+    kubectl_manifest.karpenter_node_pool
+  ]
+}

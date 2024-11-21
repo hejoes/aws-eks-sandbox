@@ -22,6 +22,8 @@ old spot node is removed.
 - AWS CLI installed and configured
 - Terraform installed
 - Exported AWS Access and Secret Key
+- [Velero](https://velero.io/docs/v1.0.0/get-started/) installed on your $PATH
+  for backups.
 
 ## Costs 💰
 

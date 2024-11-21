@@ -1,4 +1,4 @@
-#Velero
+##Velero
 resource "aws_s3_bucket" "velero" {
   bucket = var.velero_bucket
 
@@ -37,6 +37,13 @@ resource "aws_s3_bucket_policy" "velero" {
   })
 }
 
+
+resource "aws_s3_bucket_versioning" "velero" {
+  bucket = aws_s3_bucket.velero.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
 resource "aws_iam_policy" "velero" {
   name        = "velero-${var.eks_cluster}"
   description = "Policy for Velero backup and restore"
@@ -88,7 +95,7 @@ resource "aws_iam_role" "velero" {
         }
         Condition = {
           StringEquals = {
-            "${module.eks.oidc_provider}:sub" : "system:serviceaccount:velero:velero",
+            "${module.eks.oidc_provider}:sub" : "system:serviceaccount:velero:velero-server",
             "${module.eks.oidc_provider}:aud" : "sts.amazonaws.com"
           }
         }
@@ -100,13 +107,6 @@ resource "aws_iam_role" "velero" {
 resource "aws_iam_role_policy_attachment" "velero" {
   policy_arn = aws_iam_policy.velero.arn
   role       = aws_iam_role.velero.name
-}
-
-resource "aws_s3_bucket_versioning" "velero" {
-  bucket = aws_s3_bucket.velero.id
-  versioning_configuration {
-    status = "Enabled"
-  }
 }
 
 resource "kubernetes_namespace" "velero" {

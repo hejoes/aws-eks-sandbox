@@ -109,25 +109,31 @@ resource "aws_s3_bucket_versioning" "velero" {
   }
 }
 
-module "velero" {
-  source  = "terraform-module/velero/kubernetes"
-  version = "1.2.0"
+resource "kubernetes_namespace" "velero" {
+  metadata {
+    name = "velero"
+  }
+}
 
-  namespace_deploy            = true
-  app_deploy                  = true
-  cluster_name                = module.eks.cluster_name
-  bucket                      = var.velero_bucket
-  openid_connect_provider_uri = module.eks.oidc_provider
+resource "helm_release" "velero" {
+  name       = "velero"
+  repository = "https://vmware-tanzu.github.io/helm-charts"
+  chart      = "velero"
+  version    = "8.0.0" # 11Nov 2024
+  namespace  = "velero"
 
-  values = [templatefile("${path.module}/helm-files/velero.yaml", {
-    velero_bucket       = var.velero_bucket
-    eks_cluster         = var.eks_cluster
-    region              = var.region
-    service_account_arn = aws_iam_role.velero.arn
-  })]
+  values = [
+    templatefile("${path.module}/helm-files/velero.yaml", {
+      velero_bucket       = var.velero_bucket
+      eks_cluster         = var.eks_cluster
+      region              = var.region
+      service_account_arn = aws_iam_role.velero.arn
+    })
+  ]
 
   # only deploy after all karpenter resources have been created, otherwise no nodes will be provisioned for velero
   depends_on = [
-    kubectl_manifest.karpenter_node_pool
+    kubectl_manifest.karpenter_node_pool,
+    kubernetes_namespace.velero
   ]
 }

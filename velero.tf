@@ -7,7 +7,6 @@ resource "aws_s3_bucket" "velero" {
   }
 }
 
-
 resource "aws_s3_bucket_policy" "velero" {
   bucket = aws_s3_bucket.velero.id
   policy = jsonencode({
@@ -109,18 +108,13 @@ resource "aws_iam_role_policy_attachment" "velero" {
   role       = aws_iam_role.velero.name
 }
 
-resource "kubernetes_namespace" "velero" {
-  metadata {
-    name = "velero"
-  }
-}
-
 resource "helm_release" "velero" {
-  name       = "velero"
-  repository = "https://vmware-tanzu.github.io/helm-charts"
-  chart      = "velero"
-  version    = "8.0.0" # 11Nov 2024
-  namespace  = "velero"
+  name             = "velero"
+  repository       = "https://vmware-tanzu.github.io/helm-charts"
+  chart            = "velero"
+  version          = "8.0.0" # 11Nov 2024
+  namespace        = "velero"
+  create_namespace = true
 
   values = [
     templatefile("${path.module}/helm-files/velero.yaml", {
@@ -131,9 +125,9 @@ resource "helm_release" "velero" {
     })
   ]
 
-  # only deploy after all karpenter resources have been created, otherwise no nodes will be provisioned for velero
+  # only deploy after all karpenter resources have been created
   depends_on = [
     kubectl_manifest.karpenter_node_pool,
-    kubernetes_namespace.velero
+    module.eks.cluster_name
   ]
 }

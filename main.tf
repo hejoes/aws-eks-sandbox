@@ -1,10 +1,11 @@
+
 ################################################################################
-# EKS Module
+# EBS-csi Module
 ################################################################################
 
 module "ebs_csi_irsa_role" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-
+  source                = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version               = "5.48.0"
   role_name             = "${var.eks_cluster}-ebs-csi"
   attach_ebs_csi_policy = true
 
@@ -15,6 +16,31 @@ module "ebs_csi_irsa_role" {
     }
   }
 }
+
+resource "kubectl_manifest" "gp3_storage_class" {
+  yaml_body = <<-YAML
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+YAML
+
+  depends_on = [
+    module.eks,
+    helm_release.karpenter
+  ]
+}
+
+################################################################################
+# EKS Module
+################################################################################
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
@@ -171,6 +197,7 @@ resource "kubectl_manifest" "karpenter_node_class" {
   ]
 }
 
+
 resource "kubectl_manifest" "karpenter_node_pool" {
   yaml_body = <<-YAML
     apiVersion: karpenter.sh/v1
@@ -282,12 +309,6 @@ resource "kubectl_manifest" "karpenter_node_pool" {
 # Outputs
 ################################################################################
 
-
-# output "eks cluster arn" {
-#   value       = module.eks.cluster_arn
-#   description = "The cluster identifyiable arn"
-# }
-#
 output "useful_commands" {
   description = "Useful commands to help you get started"
   value       = <<EOT
@@ -299,4 +320,3 @@ output "useful_commands" {
 
   EOT
 }
-

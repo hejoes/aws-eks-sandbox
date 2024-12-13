@@ -31,14 +31,6 @@ initContainers:
     volumeMounts:
       - mountPath: /target
         name: plugins
-#
-# upgradeCRDs: true
-# installCRDs: true
-
-# image:
-#   repository: velero/velero
-#   tag: v1.15.0
-#   pullPolicy: IfNotPresent
 
 resources:
   requests:
@@ -47,5 +39,3 @@ resources:
   limits:
     cpu: 1000m
     memory: 512Mi
-# backupsEnabled: true
-# snapshotsEnabled: true

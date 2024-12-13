@@ -1,3 +1,12 @@
+variable "athena_results_bucket" {
+  description = "Name of the S3 bucket for Athena query results"
+  type        = string
+}
+
+variable "cur_bucket" {
+  description = "Name of the S3 bucket containing AWS Cost and Usage Reports"
+  type        = string
+}
 # output "aws_account_id" {
 #   value = data.aws_caller_identity.current.account_id
 # }

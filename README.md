@@ -8,6 +8,12 @@ SQS and EventBridge are created under karpenter submodule to handle spot
 interruptions and spin up new node, drain old node and move pods over before the
 old spot node is removed.
 
+> [!NOTE]
+> This setup now uses Karpenter v1.0.3 which was released Q3 2024. It introduced
+> many new mayor features, making it more production ready. Latest commits also
+> include Grafana setup along with Athena datasource. If you don't want to
+> install Grafana to your cluster, comment out the `grafana.tf`
+
 - [Prerequisites 🛠️](#prerequisites-️)
 - [Costs 💰](#costs-)
 - [Usage 🔧](#usage)

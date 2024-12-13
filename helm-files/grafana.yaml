@@ -1,0 +1,33 @@
+serviceAccount:
+  create: true
+  name: grafana
+  annotations:
+    eks.amazonaws.com/role-arn: ${service_account_arn}
+
+adminUser: admin
+adminPassword: admin
+
+persistence:
+  enabled: true
+  storageClassName: gp3
+  size: 3Gi
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Athena
+        type: grafana-athena-datasource
+        jsonData:
+          authType: default
+          defaultRegion: ${region}
+          outputLocation: s3://${output_bucket}
+          # catalog: AwsDataCatalog
+          # database: "cur_database"
+          # workgroup: "cur_workgroup"
+        editable: true
+        isDefault: false
+        version: 1
+
+plugins:
+  - grafana-athena-datasource

@@ -1,3 +1,6 @@
+athena_results_bucket = "hejoes-cur-athena-results"
+cur_bucket            = "hejoes-cur"
+
 region   = "eu-north-1"
 vpc_cidr = "10.0.0.0/16"
 
